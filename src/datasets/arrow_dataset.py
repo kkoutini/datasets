@@ -15,6 +15,7 @@
 # Lint as: python3
 """ Simple Dataset wrapping an Arrow Table."""
 
+import concurrent
 import contextlib
 import copy
 import fnmatch
@@ -1595,6 +1596,7 @@ class Dataset(DatasetInfoMixin, IndexableMixin, TensorflowDatasetMixin):
         dataset_path: str,
         fs="deprecated",
         keep_in_memory: Optional[bool] = None,
+        num_proc: Optional[int] = None,
         storage_options: Optional[dict] = None,
     ) -> "Dataset":
         """
@@ -1620,6 +1622,9 @@ class Dataset(DatasetInfoMixin, IndexableMixin, TensorflowDatasetMixin):
                 dataset will not be copied in-memory unless explicitly enabled by setting
                 `datasets.config.IN_MEMORY_MAX_SIZE` to nonzero. See more details in the
                 [improve performance](../cache#improve-performance) section.
+            num_proc (`int`, *optional*):
+                Number of processes when downloading and generating the dataset locally.
+                Multiprocessing is disabled by default.
             storage_options (`dict`, *optional*):
                 Key/value pairs to be passed on to the file-system backend, if any.
 
@@ -1698,10 +1703,32 @@ class Dataset(DatasetInfoMixin, IndexableMixin, TensorflowDatasetMixin):
         )
         keep_in_memory = keep_in_memory if keep_in_memory is not None else is_small_dataset(dataset_size)
         table_cls = InMemoryTable if keep_in_memory else MemoryMappedTable
-        arrow_table = concat_tables(
-            table_cls.from_file(posixpath.join(dest_dataset_path, data_file["filename"]))
-            for data_file in state["_data_files"]
-        )
+        num_proc = num_proc if num_proc is not None else 1
+        if num_proc > 1:
+            pbar = hf_tqdm(
+                unit="shards",
+                total=len(state["_data_files"]),
+                desc="Loading the dataset from disk",
+            )
+            tables = []
+            # Using threads for faster collecting of loaded tables compared to processes
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_proc) as pool:
+                with pbar:
+                    for table in pool.map(
+                        table_cls.from_file,
+                        [
+                            posixpath.join(dest_dataset_path, data_file["filename"])
+                            for data_file in state["_data_files"]
+                        ],
+                    ):
+                        tables.append(table)
+                        pbar.update(1)
+            arrow_table = concat_tables(tables)
+        else:
+            arrow_table = concat_tables(
+                table_cls.from_file(posixpath.join(dest_dataset_path, data_file["filename"]))
+                for data_file in state["_data_files"]
+            )
 
         split = state["_split"]
         split = Split(split) if split is not None else split
