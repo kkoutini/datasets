@@ -2461,7 +2461,11 @@ def load_dataset(
 
 
 def load_from_disk(
-    dataset_path: str, fs="deprecated", keep_in_memory: Optional[bool] = None, storage_options: Optional[dict] = None
+    dataset_path: str,
+    fs="deprecated",
+    keep_in_memory: Optional[bool] = None,
+    num_proc: Optional[int] = None,
+    storage_options: Optional[dict] = None,
 ) -> Union[Dataset, DatasetDict]:
     """
     Loads a dataset that was previously saved using [`~Dataset.save_to_disk`] from a dataset directory, or
@@ -2486,6 +2490,10 @@ def load_from_disk(
             Whether to copy the dataset in-memory. If `None`, the dataset
             will not be copied in-memory unless explicitly enabled by setting `datasets.config.IN_MEMORY_MAX_SIZE` to
             nonzero. See more details in the [improve performance](../cache#improve-performance) section.
+
+        num_proc (`int`, *optional*):
+                Number of threads used to load the arrow tables from disk.
+                Multithreading is disabled by default.
 
         storage_options (`dict`, *optional*):
             Key/value pairs to be passed on to the file-system backend, if any.
@@ -2519,9 +2527,13 @@ def load_from_disk(
     if fs.isfile(posixpath.join(dataset_path, config.DATASET_INFO_FILENAME)) and fs.isfile(
         posixpath.join(dataset_path, config.DATASET_STATE_JSON_FILENAME)
     ):
-        return Dataset.load_from_disk(dataset_path, keep_in_memory=keep_in_memory, storage_options=storage_options)
+        return Dataset.load_from_disk(
+            dataset_path, keep_in_memory=keep_in_memory, num_proc=num_proc, storage_options=storage_options
+        )
     elif fs.isfile(posixpath.join(dataset_path, config.DATASETDICT_JSON_FILENAME)):
-        return DatasetDict.load_from_disk(dataset_path, keep_in_memory=keep_in_memory, storage_options=storage_options)
+        return DatasetDict.load_from_disk(
+            dataset_path, keep_in_memory=keep_in_memory, num_proc=num_proc, storage_options=storage_options
+        )
     else:
         raise FileNotFoundError(
             f"Directory {dataset_path} is neither a `Dataset` directory nor a `DatasetDict` directory."

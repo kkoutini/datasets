@@ -1623,8 +1623,8 @@ class Dataset(DatasetInfoMixin, IndexableMixin, TensorflowDatasetMixin):
                 `datasets.config.IN_MEMORY_MAX_SIZE` to nonzero. See more details in the
                 [improve performance](../cache#improve-performance) section.
             num_proc (`int`, *optional*):
-                Number of processes when downloading and generating the dataset locally.
-                Multiprocessing is disabled by default.
+                Number of threads used to load the arrow tables from disk.
+                Multithreading is disabled by default.
             storage_options (`dict`, *optional*):
                 Key/value pairs to be passed on to the file-system backend, if any.
 

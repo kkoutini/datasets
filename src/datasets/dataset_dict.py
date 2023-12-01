@@ -1286,6 +1286,7 @@ class DatasetDict(dict):
         dataset_dict_path: PathLike,
         fs="deprecated",
         keep_in_memory: Optional[bool] = None,
+        num_proc: Optional[int] = None,
         storage_options: Optional[dict] = None,
     ) -> "DatasetDict":
         """
@@ -1310,6 +1311,9 @@ class DatasetDict(dict):
                 dataset will not be copied in-memory unless explicitly enabled by setting
                 `datasets.config.IN_MEMORY_MAX_SIZE` to nonzero. See more details in the
                 [improve performance](../cache#improve-performance) section.
+            num_proc (`int`, *optional*):
+                Number of threads used to load the arrow tables from disk.
+                Multithreading is disabled by default.
             storage_options (`dict`, *optional*):
                 Key/value pairs to be passed on to the file-system backend, if any.
 
@@ -1354,7 +1358,10 @@ class DatasetDict(dict):
         for k in splits:
             dataset_dict_split_path = posixpath.join(fs.unstrip_protocol(dataset_dict_path), k)
             dataset_dict[k] = Dataset.load_from_disk(
-                dataset_dict_split_path, keep_in_memory=keep_in_memory, storage_options=storage_options
+                dataset_dict_split_path,
+                keep_in_memory=keep_in_memory,
+                num_proc=num_proc,
+                storage_options=storage_options,
             )
         return dataset_dict
 
