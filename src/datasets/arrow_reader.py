@@ -229,6 +229,7 @@ class BaseReader:
         instructions,
         split_infos,
         in_memory=False,
+        num_proc=1,
     ):
         """Returns Dataset instance(s).
 
@@ -239,6 +240,7 @@ class BaseReader:
                 constructor as it.
             split_infos (list of SplitInfo proto): the available splits for dataset.
             in_memory (bool, default False): Whether to copy the data in-memory.
+            num_proc (int, default 1): Number of threads used to load the dataset files.
 
         Returns:
              kwargs to build a single Dataset instance.
@@ -248,7 +250,7 @@ class BaseReader:
         if not files:
             msg = f'Instruction "{instructions}" corresponds to no data!'
             raise ValueError(msg)
-        return self.read_files(files=files, original_instructions=instructions, in_memory=in_memory)
+        return self.read_files(files=files, original_instructions=instructions, in_memory=in_memory, num_proc=num_proc)
 
     def read_files(
         self,
