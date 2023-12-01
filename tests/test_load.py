@@ -1421,6 +1421,28 @@ def test_load_dataset_local_with_default_in_memory(
 
 
 @pytest.mark.parametrize("max_in_memory_dataset_size", ["default", 0, 100, 1000])
+def test_load_from_disk_with_default_in_memory_in_parallel(
+    max_in_memory_dataset_size, dataset_loading_script_dir, data_dir, tmp_path, monkeypatch
+):
+    current_dataset_size = 512  # arrow file size = 512, in-memory dataset size = 148
+    if max_in_memory_dataset_size == "default":
+        max_in_memory_dataset_size = 0  # default
+    else:
+        monkeypatch.setattr(datasets.config, "IN_MEMORY_MAX_SIZE", max_in_memory_dataset_size)
+    if max_in_memory_dataset_size:
+        expected_in_memory = current_dataset_size < max_in_memory_dataset_size
+    else:
+        expected_in_memory = False
+
+    dset = load_dataset(dataset_loading_script_dir, data_dir=data_dir, keep_in_memory=True)
+    dataset_path = os.path.join(tmp_path, "saved_dataset")
+    dset.save_to_disk(dataset_path)
+
+    with assert_arrow_memory_increases() if expected_in_memory else assert_arrow_memory_doesnt_increase():
+        _ = load_from_disk(dataset_path, num_proc=2)
+
+
+@pytest.mark.parametrize("max_in_memory_dataset_size", ["default", 0, 100, 1000])
 def test_load_from_disk_with_default_in_memory(
     max_in_memory_dataset_size, dataset_loading_script_dir, data_dir, tmp_path, monkeypatch
 ):
