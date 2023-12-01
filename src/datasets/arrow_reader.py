@@ -240,7 +240,7 @@ class BaseReader:
                 constructor as it.
             split_infos (list of SplitInfo proto): the available splits for dataset.
             in_memory (bool, default False): Whether to copy the data in-memory.
-            num_proc (int, default 1): Number of threads used to load the dataset files.
+            num_proc (int, default 1): Number of threads to load the dataset files.
 
         Returns:
              kwargs to build a single Dataset instance.
