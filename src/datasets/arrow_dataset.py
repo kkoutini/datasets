@@ -1704,13 +1704,14 @@ class Dataset(DatasetInfoMixin, IndexableMixin, TensorflowDatasetMixin):
         keep_in_memory = keep_in_memory if keep_in_memory is not None else is_small_dataset(dataset_size)
         table_cls = InMemoryTable if keep_in_memory else MemoryMappedTable
         num_proc = num_proc if num_proc is not None else 1
+        tables = []
+        pbar = hf_tqdm(
+            unit="shards",
+            total=len(state["_data_files"]),
+            desc="Loading the dataset from disk",
+        )
         if num_proc > 1:
-            pbar = hf_tqdm(
-                unit="shards",
-                total=len(state["_data_files"]),
-                desc="Loading the dataset from disk",
-            )
-            tables = []
+            pbar.set_description(f"Loading the dataset from disk using {num_proc} threads")
             # Using threads for faster collecting of loaded tables compared to processes
             with concurrent.futures.ThreadPoolExecutor(max_workers=num_proc) as pool:
                 with pbar:
@@ -1723,12 +1724,15 @@ class Dataset(DatasetInfoMixin, IndexableMixin, TensorflowDatasetMixin):
                     ):
                         tables.append(table)
                         pbar.update(1)
-            arrow_table = concat_tables(tables)
         else:
-            arrow_table = concat_tables(
-                table_cls.from_file(posixpath.join(dest_dataset_path, data_file["filename"]))
-                for data_file in state["_data_files"]
-            )
+            with pbar:
+                for table in map(
+                    table_cls.from_file,
+                    [posixpath.join(dest_dataset_path, data_file["filename"]) for data_file in state["_data_files"]],
+                ):
+                    tables.append(table)
+                    pbar.update(1)
+        arrow_table = concat_tables(tables)
 
         split = state["_split"]
         split = Split(split) if split is not None else split
