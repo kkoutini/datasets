@@ -14,13 +14,14 @@
 
 # Lint as: python3
 """ Arrow ArrowReader."""
-
+import concurrent
 import copy
 import math
 import os
 import re
 import shutil
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Union
 
@@ -181,7 +182,7 @@ class BaseReader:
         """Returns a Dataset instance from given (filename, skip, take)."""
         raise NotImplementedError
 
-    def _read_files(self, files, in_memory=False) -> Table:
+    def _read_files(self, files, in_memory=False, num_proc=1) -> Table:
         """Returns Dataset for given file instructions.
 
         Args:
@@ -189,6 +190,7 @@ class BaseReader:
                 The filenames contain the absolute path, not relative.
                 skip/take indicates which example read in the file: `ds.slice(skip, take)`
             in_memory (bool, default False): Whether to copy the data in-memory.
+            num_proc (int, default 1): Number of threads used to load the files.
         """
         if len(files) == 0 or not all(isinstance(f, dict) for f in files):
             raise ValueError("please provide valid file informations")
@@ -196,9 +198,14 @@ class BaseReader:
         files = copy.deepcopy(files)
         for f in files:
             f["filename"] = os.path.join(self._path, f["filename"])
-        for f_dict in files:
-            pa_table: Table = self._get_table_from_filename(f_dict, in_memory=in_memory)
-            pa_tables.append(pa_table)
+        pa_table: Table
+        if num_proc > 1:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_proc) as pool:
+                for pa_table in pool.map(partial(self._get_table_from_filename, in_memory=in_memory), files):
+                    pa_tables.append(pa_table)
+        else:
+            for pa_table in map(partial(self._get_table_from_filename, in_memory=in_memory), files):
+                pa_tables.append(pa_table)
         pa_tables = [t for t in pa_tables if len(t) > 0]
         if not pa_tables and (self._info is None or self._info.features is None):
             raise ValueError(
@@ -248,6 +255,7 @@ class BaseReader:
         files: List[dict],
         original_instructions: Union[None, "ReadInstruction", "Split"] = None,
         in_memory=False,
+        num_proc=1,
     ):
         """Returns single Dataset instance for the set of file instructions.
 
@@ -257,12 +265,13 @@ class BaseReader:
                 skip/take indicates which example read in the file: `ds.skip().take()`
             original_instructions: store the original instructions used to build the dataset split in the dataset.
             in_memory (bool, default False): Whether to copy the data in-memory.
+            num_proc (int, default 1): Number of threads used to load the files.
 
         Returns:
             kwargs to build a Dataset instance.
         """
         # Prepend path to filename
-        pa_table = self._read_files(files, in_memory=in_memory)
+        pa_table = self._read_files(files, in_memory=in_memory, num_proc=num_proc)
         # If original_instructions is not None, convert it to a human-readable NamedSplit
         if original_instructions is not None:
             from .splits import Split  # noqa
