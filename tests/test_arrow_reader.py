@@ -123,11 +123,12 @@ def test_read_table(in_memory, dataset, arrow_file):
 
 
 @pytest.mark.parametrize("in_memory", [False, True])
-def test_read_files(in_memory, dataset, arrow_file):
+@pytest.mark.parametrize("num_proc", [1, 2])
+def test_read_files(in_memory, num_proc, dataset, arrow_file):
     filename = arrow_file
     reader = ArrowReader("", None)
     with assert_arrow_memory_increases() if in_memory else assert_arrow_memory_doesnt_increase():
-        dataset_kwargs = reader.read_files([{"filename": filename}], in_memory=in_memory)
+        dataset_kwargs = reader.read_files([{"filename": filename}], in_memory=in_memory, num_proc=num_proc)
     assert dataset_kwargs.keys() == {"arrow_table", "info", "split"}
     table = dataset_kwargs["arrow_table"]
     assert table.shape == dataset.data.shape
